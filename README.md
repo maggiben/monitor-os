@@ -1,4 +1,4 @@
-## Create service
+## Create service in main
 `sudo vi /etc/systemd/system/indoor-sensor-status.service`
 Add this code
 ```sh
@@ -11,6 +11,25 @@ Type=simple
 User=bmaggi
 WorkingDirectory=/monitor
 ExecStart=/monitor/base.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Create service
+`sudo vi /etc/systemd/system/indoor-watering-status.service`
+Add this code
+```sh
+[Unit]
+Description=Indoor Watering Status Service
+After=network.target
+
+[Service]
+Type=simple
+User=bmaggi
+WorkingDirectory=/monitor
+ExecStart=/monitor/base.watering.sh
 Restart=always
 
 [Install]
