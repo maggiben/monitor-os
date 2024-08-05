@@ -4,11 +4,22 @@
 SENSORS_LIST_FILE="sensors.txt" # sensor list
 SENSOR_WORKDIR="/monitor"
 SENSOR_SCRIPT="base.sensor.sh" # sensor script
+# Get the name of the parent process
+PPID_NAME=$(ps -o comm= $PPID)
+# Delay between data snapshots
+SLEEP=600
 
 # Read the sensor names into an array
 mapfile -t SENSORS < "$SENSORS_LIST_FILE"
 
-check_sensor_update() {
+function check_systemd_sleep() {
+    # Check if the script was called by systemd
+    if [ "$PPID_NAME" = "systemd" ]; then
+        sleep $SLEEP  # or any sleep duration you need
+    fi
+}
+
+function check_sensor_update() {
     local sensor_ip=$1
     local local_file=$2
     local remote_file="$SENSOR_WORKDIR/$(basename $local_file)"
@@ -28,7 +39,7 @@ check_sensor_update() {
 }
 
 # Function to install sensor update
-install_sensor_update() {
+function install_sensor_update() {
   local sensor_ip=$1
   local local_file=$2
   local remote_file="/monitor/$(basename $local_file)"
@@ -74,5 +85,5 @@ for SENSOR_NAME in "${SENSORS[@]}"; do
 done
 echo  "]"
 
-sleep 120
+check_systemd_sleep
 

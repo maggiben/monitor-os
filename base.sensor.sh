@@ -82,6 +82,8 @@ echo $PING_TIME
 
 # Get system uptime
 UPTIME=$(uptime)
+DATE=$(date --iso-8601=seconds)
 echo "[$HOSTNAME:uptime]"
 echo "uptime: $UPTIME"
+echo "date: $DATE"
 

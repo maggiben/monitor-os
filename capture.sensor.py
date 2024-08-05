@@ -8,20 +8,20 @@ from pymongo import MongoClient
 def parse_input(input_data, sensor_name):
     lines = input_data.strip().split("\n")
     data = {}
-    data[sensor_name] = {}
+    data["sensor"] = sensor_name
     current_section = None
 
     for line in lines:
         if line.startswith(f"[{sensor_name}:") and line.endswith("]"):
             current_section = line.strip("[").strip(f"{sensor_name}").strip(":").strip("]")
-            data[sensor_name][current_section] = {}
+            data[current_section] = {}
         elif line.startswith("[") and line.endswith("]"):
             current_section = None
         else:
             if current_section:
                 try:
                     key, value = map(str.strip, line.split(":", 1))
-                    data[sensor_name][current_section][key] = value
+                    data[current_section][key] = value
                 except ValueError:
                     continue
 
@@ -41,13 +41,13 @@ def main():
     
     # Add a timestamp
     timestamp = datetime.datetime.now().isoformat()
-    parsed_data[args.sensor]['timestamp'] = timestamp
+    parsed_data['timestamp'] = timestamp
     
     # Convert the Python object to a JSON string
     json_string = json.dumps(parsed_data, indent=4)
 
     # Save to MongoDB
-    client = MongoClient("mongodb://admin:admin@localhost:27017/")
+    client = MongoClient("mongodb://admin:admin@100.127.213.29:27017/")
     db = client["dexterlab"]
     collection = db["sensors"]
     collection.insert_one(parsed_data)
