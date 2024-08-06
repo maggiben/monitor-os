@@ -3,6 +3,7 @@
 # Define the PID file path
 PIDFILE="/tmp/watering/serial.pid"
 ALARMPIDFILE="/tmp/watering/alarm.pid"
+PYTHONENV="./pyenv"
 LOGDIR="./logs"
 ALARM_JOB_ID=""
 PIDDIR=$(dirname "$PIDFILE")
@@ -24,6 +25,7 @@ if [ -f "$PIDFILE" ] && kill -0 $(cat "$PIDFILE") 2>/dev/null; then
 fi
 
 create_dir_if_not $PIDDIR
+create_dir_if_not $LOGDIR
 # Write the PID to the file
 echo $$ > "$PIDFILE"
 
@@ -37,14 +39,18 @@ cleanup() {
 }
 
 # Function to get the next alarm in minutes
+function get_watering_time_minutes() {
+    local watering_time=$(python3 serial-ping.py -m get-watering-time 2>/dev/null | awk -F'>' '{print $2}' | awk -F' ' '{print int(($2 + 59) / 60)}')
+    echo "Watering time: $watering_time"
+    return $watering_time
+}
+
+
+# Function to get the next alarm in minutes
 function get_next_alarm_minutes() {
     local next_alarm=$(python3 serial-ping.py -m next-alarm 2>/dev/null | awk -F'>' '{print $2}' | awk -F' ' '{print int(($2 + 59) / 60)}')
-    local watering_time=$(python3 serial-ping.py -m get-watering-time 2>/dev/null | awk -F'>' '{print $2}' | awk -F' ' '{print int(($2 + 59) / 60)}')
-    local next_timer=$(($next_alarm + $watering_time + 1))
     echo "Next alarm: $next_alarm"
-    echo "Watering time: $watering_time"
-    echo "Next timer: $next_timer"
-    return $next_timer
+    return $next_alarm
 }
 
 # Function to check if an alarm (job) ID is running
@@ -68,11 +74,14 @@ check_alarm_running() {
 
 function run_alarm() {
     get_next_alarm_minutes
-    local minutes=$?
+    local next_alarm_minutes=$?
+    get_watering_time_minutes
+    local watering_time_minutes=$?
+    local total_minutes=$(($next_alarm_minutes + $watering_time_minutes + 1))
     # remove old task data
-    local job_id=$(echo "python3 serial-ping.py -m read-task > read-task.txt && rm -f $ALARMPIDFILE && rm -f next-timer.txt" | at now + $minutes minutes 2>&1 | awk '/job/ {print $2}')
+    local job_id=$(echo "python3 serial-ping.py -m read-task > read-task.txt && rm -f $ALARMPIDFILE && rm -f next-timer.txt" | at now + $total_minutes minutes 2>&1 | awk '/job/ {print $2}')
     # Extract the job ID from the output
-    echo "Alarm will trigger in $minutes minutes from now"
+    echo "Alarm will trigger in $total_minutes minutes from now"
     echo $job_id > "$ALARMPIDFILE"
     # Return
     return $job_id
@@ -99,7 +108,6 @@ function check_flow() {
     # Convert the flow values and last flow values to arrays
     IFS=' ' read -r -a current_flow <<< "${flow//[^0-9 ]/}"
     IFS=' ' read -r -a last_flow_array <<< "${last_flow//[^0-9 ]/}"
-
     
     
     # Calculate the delta change
@@ -108,15 +116,15 @@ function check_flow() {
     for i in ${!current_flow[@]}; do
         local ml=$((current_flow[i] - last_flow_array[i] | 0))
         delta[i]=$ml
-        message="$message Plant $i: {$ml}ml"
+        message="$message Plant $i: $ml ml"
     done
 
     
-    local telegram_message="🪴💧 Ive finished watering the plants: $message"
+    local telegram_message="Ive finished 💧watering the 🪴plants: $message"
     echo $telegram_message;
 
     # Call the Telegram bot script with the delta change message
-    ./pyenv/bin/python3 ./telegram-bot.py "$telegram_message"
+    $PYTHONENV/bin/python3 ./telegram-bot.py "$telegram_message"
 
     # Write the new flow values to last-flow.txt
     cat "read-task.txt" > "last-flow.txt"
