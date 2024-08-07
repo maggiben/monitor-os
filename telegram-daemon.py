@@ -67,6 +67,21 @@ def signal_handler(sig, frame):
     remove_pidfile(PIDFILE)
     sys.exit(0)
 
+def format_time(seconds):
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    parts = []
+    if days > 0:
+        parts.append(f"{days} day{'s' if days > 1 else ''}")
+    if hours > 0:
+        parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
+    if minutes > 0:
+        parts.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
+    if secs > 0 or (days == 0 and hours == 0 and minutes == 0):
+        parts.append(f"{secs} second{'s' if secs > 1 else ''}")
+    return ', '.join(parts)
 
 # Define a few command handlers. These usually take the two arguments update and
 # context.
@@ -96,17 +111,9 @@ async def watering_time_command(update: Update, context: ContextTypes.DEFAULT_TY
         if "total_watering_time:" in output:
             total_watering_time_str = output.split('total_watering_time:')[1].strip()
             total_watering_time_seconds = int(total_watering_time_str)
+            readable_time = format_time(total_watering_time_seconds)
             
-            minutes, seconds = divmod(total_watering_time_seconds, 60)
-            
-            if minutes > 0 and seconds > 0:
-                response = f"The total watering time needed is {minutes} Minutes and {seconds} Seconds"
-            elif minutes > 0:
-                response = f"The total watering time needed is {minutes} Minute{'s' if minutes > 1 else ''}"
-            else:
-                response = f"The total watering time needed is {seconds} Second{'s' if seconds > 1 else ''}"
-            
-            await update.message.reply_text(response)
+            await update.message.reply_text(f"The total watering time needed is {readable_time}.")
         else:
             await update.message.reply_text("Could not find the watering time information.")
     except subprocess.CalledProcessError as e:
@@ -115,7 +122,6 @@ async def watering_time_command(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         logger.error(f"Error: {e}")
         await update.message.reply_text("An error occurred while processing the command.")
-
 
 async def next_alarm_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /next-alarm command."""
@@ -137,8 +143,8 @@ async def next_alarm_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if "nextAlarmSecs:" in line:
                 next_alarm_secs_str = line.split('nextAlarmSecs:')[1].split()[0]
                 next_alarm_secs = int(next_alarm_secs_str)
-                next_alarm_minutes = -(-next_alarm_secs // 60)  # Round up
-                await update.message.reply_text(f"The next alarm is in {next_alarm_minutes} minutes.")
+                readable_time = format_time(next_alarm_secs)
+                await update.message.reply_text(f"The next alarm is in {readable_time}.")
                 return
         
         await update.message.reply_text("Could not find the next alarm information.")
@@ -149,7 +155,38 @@ async def next_alarm_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.error(f"Error: {e}")
         await update.message.reply_text("An error occurred while processing the command.")
 
+async def trigger_alarm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Triggers an alarm in 2 minutes"""
+    try:
+        # Execute the command
+        result = subprocess.run(
+            ["python3", "serial-ping.py", "-m", "trigger-alarm"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        # Parse the output
+        output = result.stdout.strip()
+        logger.info(f"Command output: {output}")
+        # Execute the command
+        result = subprocess.run(
+            ["systemctl", "restart", "monitor-watering"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        # Parse the output
+        output = result.stdout.strip()
+        logger.info(f"Command output: {output}")
+        
+        await update.message.reply_text("Watering alarm triggered.")
 
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed: {e}")
+        await update.message.reply_text("Failed to execute the command.")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        await update.message.reply_text("An error occurred while processing the command.")
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
     await update.message.reply_text("Hello master how can I assist you?")
@@ -170,6 +207,7 @@ def main() -> None:
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(CommandHandler("next_alarm", next_alarm_command))
+        application.add_handler(CommandHandler("trigger_alarm", trigger_alarm))
         application.add_handler(CommandHandler("watering_time", watering_time_command))
 
         # on non command i.e message - echo the message on Telegram
