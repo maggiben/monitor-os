@@ -24,10 +24,10 @@ import subprocess
 
 from telegram import ForceReply, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.error import TimedOut
 
 # # Replace 'YOUR_BOT_TOKEN' with the token you got from the BotFather
 BOT_TOKEN = 'YOUR_BOT_TOKEN'
-
 PIDFILE = '/tmp/telegram-daemon.pid'
 
 # Enable logging
@@ -78,6 +78,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=ForceReply(selective=True),
     )
 
+async def watering_time_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle the /watering_time command."""
+    try:
+        # Execute the command
+        result = subprocess.run(
+            ["python3", "serial-ping.py", "-m", "get-watering-time"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        # Parse the output
+        output = result.stdout.strip()
+        logger.info(f"Command output: {output}")
+
+        # Extract the total_watering_time value
+        if "total_watering_time:" in output:
+            total_watering_time_str = output.split('total_watering_time:')[1].strip()
+            total_watering_time_seconds = int(total_watering_time_str)
+            
+            minutes, seconds = divmod(total_watering_time_seconds, 60)
+            
+            if minutes > 0 and seconds > 0:
+                response = f"The total watering time needed is {minutes} Minutes and {seconds} Seconds"
+            elif minutes > 0:
+                response = f"The total watering time needed is {minutes} Minute{'s' if minutes > 1 else ''}"
+            else:
+                response = f"The total watering time needed is {seconds} Second{'s' if seconds > 1 else ''}"
+            
+            await update.message.reply_text(response)
+        else:
+            await update.message.reply_text("Could not find the watering time information.")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed: {e}")
+        await update.message.reply_text("Failed to execute the command.")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        await update.message.reply_text("An error occurred while processing the command.")
+
+
 async def next_alarm_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /next-alarm command."""
     try:
@@ -123,20 +162,25 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def main() -> None:
     """Start the bot."""
-    # Create the Application and pass it your bot's token.
-    application = Application.builder().token(BOT_TOKEN).build()
+    try:
+        # Create the Application and pass it your bot's token.
+        application = Application.builder().token(BOT_TOKEN).read_timeout(10).connect_timeout(10).build()
 
-    # on different commands - answer in Telegram
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("next_alarm", next_alarm_command))
+        # on different commands - answer in Telegram
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("next_alarm", next_alarm_command))
+        application.add_handler(CommandHandler("watering_time", watering_time_command))
 
-    # on non command i.e message - echo the message on Telegram
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+        # on non command i.e message - echo the message on Telegram
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-    # Run the bot until the user presses Ctrl-C
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
+        # Run the bot until the user presses Ctrl-C
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    except TimedOut as e:
+        logger.error(f"Bot initialization timed out: {e}")
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     if check_pid(PIDFILE):
