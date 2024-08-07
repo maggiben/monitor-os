@@ -3,10 +3,21 @@
 # Define the PID file path
 PIDFILE="/tmp/watering/serial.pid"
 ALARMPIDFILE="/tmp/watering/alarm.pid"
+PIOENV=/home/bmaggi/.platformio/penv
 PYTHONENV="./pyenv"
 LOGDIR="./logs"
 ALARM_JOB_ID=""
 PIDDIR=$(dirname "$PIDFILE")
+# Get the name of the parent process
+PPID_NAME=$(ps -o comm= $PPID)
+SLEEP=60
+
+function check_systemd_sleep() {
+    # Check if the script was called by systemd
+    if [ "$PPID_NAME" = "systemd" ]; then
+        sleep $SLEEP  # or any sleep duration you need
+    fi
+}
 
 function create_dir_if_not() {
     # Create the directory if it does not exist
@@ -41,7 +52,7 @@ cleanup() {
 # Function to get the next alarm in minutes
 function get_watering_time_minutes() {
     local watering_time=$(python3 serial-ping.py -m get-watering-time 2>/dev/null | awk -F'>' '{print $2}' | awk -F' ' '{print int(($2 + 59) / 60)}')
-    echo "Watering time: $watering_time"
+    echo $watering_time
     return $watering_time
 }
 
@@ -49,7 +60,7 @@ function get_watering_time_minutes() {
 # Function to get the next alarm in minutes
 function get_next_alarm_minutes() {
     local next_alarm=$(python3 serial-ping.py -m next-alarm 2>/dev/null | awk -F'>' '{print $2}' | awk -F' ' '{print int(($2 + 59) / 60)}')
-    echo "Next alarm: $next_alarm"
+    echo $next_alarm
     return $next_alarm
 }
 
@@ -73,11 +84,12 @@ check_alarm_running() {
 }
 
 function run_alarm() {
-    get_next_alarm_minutes
-    local next_alarm_minutes=$?
-    get_watering_time_minutes
-    local watering_time_minutes=$?
+    local next_alarm_minutes=$(get_next_alarm_minutes)
+    echo "Next alarm minutes: $next_alarm_minutes"
+    local watering_time_minutes=$(get_watering_time_minutes)
+    echo "Watering time minutes: $get_watering_time_minutes"
     local total_minutes=$(($next_alarm_minutes + $watering_time_minutes + 1))
+    echo "Total minutes till alarm: $total_minutes"
     # remove old task data
     local job_id=$(echo "python3 serial-ping.py -m read-task > read-task.txt && rm -f $ALARMPIDFILE && rm -f next-timer.txt" | at now + $total_minutes minutes 2>&1 | awk '/job/ {print $2}')
     # Extract the job ID from the output
@@ -114,7 +126,12 @@ function check_flow() {
     local message=""
     local delta=()
     for i in ${!current_flow[@]}; do
-        local ml=$((current_flow[i] - last_flow_array[i] | 0))
+        local ml=0
+        if [ $last_flow_array[i] -eq 0 ]; then
+            ml=$((current_flow[i] | 0))
+        else
+            ml=$((current_flow[i] - last_flow_array[i] | 0))
+        fi
         delta[i]=$ml
         message="$message Plant $i: $ml ml"
     done
@@ -159,6 +176,7 @@ while true; do
         echo "Alarm $ALARM_JOB_ID is running"
     fi
     # Sleep 
+    check_systemd_sleep
     sleep 1
 done
 
