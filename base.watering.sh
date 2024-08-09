@@ -66,20 +66,36 @@ function get_next_alarm_minutes() {
 
 # Function to check if an alarm (job) ID is running
 check_alarm_running() {
-    if [ ! -f "$ALARMPIDFILE" ]; then
-        return 1
-    fi
+ # Check if the alarm PID file exists
+    if [ -f "$ALARMPIDFILE" ]; then
+        # Read the job ID from the PID file
+        local job_id=$(cat "$ALARMPIDFILE")
 
-    local job_id=$(cat $ALARMPIDFILE);
+        # Get the list of scheduled jobs and check if the job ID is present
+        atq 2>/dev/null | grep -q "^$job_id"
 
-    # Get the list of scheduled jobs and check if the job ID is present
-    atq | grep -q "^$job_id"
-  
-    # Check the exit status of grep
-    if [ $? -eq 0 ]; then
-        return 0
+        # Check the exit status of grep
+        if [ $? -eq 0 ]; then
+            return 0  # Job is still scheduled
+        else
+            return 1  # Job ID not found in the scheduled jobs
+        fi
     else
-        return 1
+        # PID file doesn't exist, so we can't directly check the job ID
+        # We need to check if any job exists that could match the expected criteria
+
+        # Assume you know some criteria to identify the correct job (e.g., command or user)
+        local alarms=$(atq 2>/dev/null | wc -l)
+
+        if [ $local -eq 0 ]; then
+            return 1 # No alarms running
+        else
+            # For each alarm ID in atq, issue atrm to remove the jobs
+            atq 2>/dev/null | awk '{print $1}' | while read job_id; do
+                atrm "$job_id"
+            done
+            return 1  # All alarms removed
+        fi
     fi
 }
 
