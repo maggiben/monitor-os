@@ -69,6 +69,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def format_time(seconds):
+    """Format time for human consumption"""
     sign = "-" if seconds < 0 else ""
     seconds = abs(seconds)
     days = seconds // 86400
