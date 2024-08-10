@@ -20,6 +20,7 @@ import os
 import sys
 import atexit
 import signal
+import datetime
 import subprocess
 
 from telegram import ForceReply, Update
@@ -68,6 +69,8 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def format_time(seconds):
+    sign = "-" if seconds < 0 else ""
+    seconds = abs(seconds)
     days = seconds // 86400
     hours = (seconds % 86400) // 3600
     minutes = (seconds % 3600) // 60
@@ -81,7 +84,7 @@ def format_time(seconds):
         parts.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
     if secs > 0 or (days == 0 and hours == 0 and minutes == 0):
         parts.append(f"{secs} second{'s' if secs > 1 else ''}")
-    return ', '.join(parts)
+    return sign + ', '.join(parts)
 
 # Define a few command handlers. These usually take the two arguments update and
 # context.
@@ -187,10 +190,46 @@ async def trigger_alarm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     except Exception as e:
         logger.error(f"Error: {e}")
         await update.message.reply_text("An error occurred while processing the command.")
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
     await update.message.reply_text("Hello master how can I assist you?")
 
+async def time_diff_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Calculates time difference between pi and esp32 command."""
+    try:
+        # Execute the command to get the current time from the ESP32
+        result = subprocess.run(
+            ["python3", "serial-ping.py", "-m", "time"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        # Parse the output
+        output = result.stdout.strip()
+        logger.info(f"Command output: {output}")
+
+        # Parse the ESP32 time
+        esp_time = datetime.datetime.strptime(output, "%Y/%m/%d %H:%M:%S")
+
+        # Get the current host time
+        host_time = datetime.datetime.now()
+
+        # Calculate the time difference in seconds
+        time_diff = (host_time - esp_time).total_seconds()
+
+        # Format the time difference
+        readable_time_diff = format_time(int(time_diff))
+
+        # Send the time difference to the user
+        await update.message.reply_text(f"Time diff is: {readable_time_diff}.")
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed: {e}")
+        await update.message.reply_text("Failed to execute the command.")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        await update.message.reply_text("An error occurred while processing the command.")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Echo the user message."""
@@ -209,6 +248,7 @@ def main() -> None:
         application.add_handler(CommandHandler("next_alarm", next_alarm_command))
         application.add_handler(CommandHandler("trigger_alarm", trigger_alarm))
         application.add_handler(CommandHandler("watering_time", watering_time_command))
+        application.add_handler(CommandHandler("time_diff", time_diff_command))
 
         # on non command i.e message - echo the message on Telegram
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
@@ -239,3 +279,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         pass
+
