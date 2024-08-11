@@ -87,6 +87,7 @@ function get_sensor_data() {
 }
 
 sensor_data=$(get_sensor_data)
+echo $sensor_data
 # Save to DB
 curl -s -X 'POST' \
     "${API_ENDPOINT}" \
