@@ -1,3 +1,3 @@
 indoor-big
 indoor-small
-indoor-smart-wate
+indoor-smart-water

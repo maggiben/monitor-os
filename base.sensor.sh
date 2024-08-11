@@ -4,7 +4,7 @@ HOSTNAME=$(hostname)
 # Get the name of the script
 SCRIPT_FILE_NAME=$(basename $0)
 # Function to convert bytes to human-readable format
-convert_to_human_readable() {
+function convert_to_human_readable() {
     local BYTES=$1
     local UNIT="B"
     local VALUE=$BYTES
@@ -22,6 +22,41 @@ convert_to_human_readable() {
 
     # Round to 2 decimal places
     printf "%.2f %s" $VALUE $UNIT
+}
+
+# Function to process last-flow.txt and generate the output string
+function process_flow_file() {
+    local file_name="last-flow.txt"
+    local message=""
+  
+    # Check if the file exists
+    if [[ -f $file_name ]]; then
+    # Read the file contents
+    local file_content
+    file_content=$(<"$file_name")
+
+    # Extract the flow values using a regular expression
+    if [[ $file_content =~ flow:\ \[(.*)\] ]]; then
+        # Get the captured group with flow values
+        local flow_values="${BASH_REMATCH[1]}"
+
+        # Convert flow values into an array
+        IFS=', ' read -r -a flow_array <<< "$flow_values"
+
+        # Loop through the flow array and generate the output string
+        for i in "${!flow_array[@]}"; do
+            message+="plant_$i: ${flow_array[$i]}\n"
+        done
+
+        # Print the generated message
+        echo "$message"
+        return 0
+        else
+            return 1
+        fi
+    else
+        return 1
+    fi
 }
 
 # Script info
@@ -50,6 +85,16 @@ TEMPERATURE=$(vcgencmd measure_temp 2>/dev/null | awk -F'=' '{print $2}')
 # Print the results
 echo "[$HOSTNAME:sensors]"
 echo "temperature: $TEMPERATURE"
+
+# Get Watering flow status TODO: move to special host scritps
+if [[ $HOSTNAME == "indoor-smart-water" ]]; then
+    FLOW=$(process_flow_file)
+    if [ $? -eq 0 ]; then
+        # Print the results
+        echo "[$HOSTNAME:flow]"
+        printf "%b\n" "$FLOW"
+    fi
+fi
 
 # Get the load averages
 # Get the number of CPU cores
