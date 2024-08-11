@@ -65,34 +65,34 @@ function install_sensor_update() {
   fi
 }
 
-echo "["
-# Iterate over each sensor name
-for SENSOR_NAME in "${SENSORS[@]}"; do
-    # Get the IP address of the sensor from the output of network-devices.sh
-    SENSOR_IP=$(sudo docker exec tailscaled tailscale status | grep "$SENSOR_NAME" | awk '{print $1}')
-    if [ -n "$SENSOR_IP" ]; then
-        check_sensor_update $SENSOR_IP $SENSOR_SCRIPT
-        if [ $? -eq 1 ]; then
-            install_sensor_update $SENSOR_IP $SENSOR_SCRIPT
+function get_sensor_data() {
+    echo "["
+    # Iterate over each sensor name
+    for SENSOR_NAME in "${SENSORS[@]}"; do
+        # Get the IP address of the sensor from the output of network-devices.sh
+        SENSOR_IP=$(sudo docker exec tailscaled tailscale status | grep "$SENSOR_NAME" | awk '{print $1}')
+        if [ -n "$SENSOR_IP" ]; then
+            check_sensor_update $SENSOR_IP $SENSOR_SCRIPT
+            if [ $? -eq 1 ]; then
+                install_sensor_update $SENSOR_IP $SENSOR_SCRIPT
+            fi
+            # Get the base sensor data
+            BASE_SENSOR_DATA=$(ssh $SENSOR_IP "cd /$SENSOR_WORKDIR && ./$SENSOR_SCRIPT" 2>/dev/null | srvenv/bin/python capture.sensor.py -s $SENSOR_NAME)
+            printf "%b\t\n" "$BASE_SENSOR_DATA, "
+        else
+            echo "Sensor $SENSOR_NAME not found in network-devices.sh output."
         fi
-        # Get the base sensor data
-        BASE_SENSOR_DATA=$(ssh $SENSOR_IP "cd /$SENSOR_WORKDIR && ./$SENSOR_SCRIPT" 2>/dev/null | srvenv/bin/python capture.sensor.py -s $SENSOR_NAME)
-        # Save to DB
-        curl -s -X 'POST' \
-            "${API_ENDPOINT}" \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -d $BASE_SENSOR_DATA >> /dev/null | jq
-            # -d '{
-            #     device_id: '${SENSOR_NAME}',
-            #     temperature: '${temp}'
-            # }' >> /dev/null | jq
-        printf "%b\n" "$BASE_SENSOR_DATA, "
-    else
-        echo "Sensor $SENSOR_NAME not found in network-devices.sh output."
-    fi
-done
-echo  "]"
+    done
+    echo  "]"
+}
+
+sensor_data=$(get_sensor_data)
+# Save to DB
+curl -s -X 'POST' \
+    "${API_ENDPOINT}" \
+    -H 'accept: application/json' \
+    -H 'Content-Type: application/json' \
+    -d $sensor_data >> /dev/null | jq
 
 check_systemd_sleep
 
