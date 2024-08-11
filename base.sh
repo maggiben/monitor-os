@@ -66,6 +66,7 @@ function install_sensor_update() {
 }
 
 function get_sensor_data() {
+    local first=true  # Flag to check if it's the first item
     echo "["
     # Iterate over each sensor name
     for SENSOR_NAME in "${SENSORS[@]}"; do
@@ -78,22 +79,35 @@ function get_sensor_data() {
             fi
             # Get the base sensor data
             BASE_SENSOR_DATA=$(ssh $SENSOR_IP "cd /$SENSOR_WORKDIR && ./$SENSOR_SCRIPT" 2>/dev/null | srvenv/bin/python capture.sensor.py -s $SENSOR_NAME)
-            printf "%b\t\n" "$BASE_SENSOR_DATA, "
+            # Add a comma if it's not the first item
+            if [ "$first" = true ]; then
+                first=false
+            else
+                printf ",\n"
+            fi
+
+            printf "%b\n" "$BASE_SENSOR_DATA"
         else
-            echo "Sensor $SENSOR_NAME not found in network-devices.sh output."
+            # echo "Sensor $SENSOR_NAME not found in network-devices.sh output."
+            return 1
         fi
     done
     echo  "]"
+    return 0
 }
 
 sensor_data=$(get_sensor_data)
-echo $sensor_data
-# Save to DB
-curl -s -X 'POST' \
-    "${API_ENDPOINT}" \
-    -H 'accept: application/json' \
-    -H 'Content-Type: application/json' \
-    -d $sensor_data >> /dev/null | jq
+if [ $? -eq 0 ]; then
+    # echo $sensor_data
+    # Save to DB
+    echo $sensor_data
+    curl -s -X 'POST' \
+        "${API_ENDPOINT}" \
+        -H 'accept: application/json' \
+        -H 'Content-Type: application/json' \
+        --data-binary "$sensor_data" >> /dev/null | jq
+fi
+
+
 
 check_systemd_sleep
-

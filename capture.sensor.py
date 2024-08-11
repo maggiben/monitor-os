@@ -39,10 +39,6 @@ def main():
     # Parse the input data
     parsed_data = parse_input(input_data, args.sensor)
     
-    # Add a timestamp
-    timestamp = datetime.datetime.now().isoformat()
-    parsed_data['timestamp'] = timestamp
-    
     # Convert the Python object to a JSON string
     json_string = json.dumps(parsed_data, indent=4)
 
