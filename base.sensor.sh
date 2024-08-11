@@ -29,7 +29,7 @@ SCRIPT_UPDATE_TIME=$(stat -c %y $SCRIPT_FILE_NAME)
 echo "[$HOSTNAME:script]"
 echo "version: $VERSION"
 echo "file: $SCRIPT_FILE_NAME"
-echo "lastUpdate: $SCRIPT_UPDATE_TIME"
+echo "last_update: $SCRIPT_UPDATE_TIME"
 
 # Get the size of /snapshots
 SNAPSHOT_SIZE=$(du -hs /snapshots 2>/dev/null | awk '{print $1}')
@@ -51,11 +51,28 @@ TEMPERATURE=$(vcgencmd measure_temp 2>/dev/null | awk -F'=' '{print $2}')
 echo "[$HOSTNAME:sensors]"
 echo "temperature: $TEMPERATURE"
 
-# Get the load average
-LOAD_AVERAGE=$(uptime 2>/dev/null | awk -F'load average: ' '{print $2}')
+# Get the load averages
+# Get the number of CPU cores
+CPU_CORES=$(nproc)
+
+# Extract load averages from uptime command
+CPU_LOAD_AVERAGES=$(uptime | awk -F'load average: ' '{print $2}' | tr -d ' ')
+
+# Extract individual load averages
+CPU_LOAD_1=$(echo $CPU_LOAD_AVERAGES | cut -d, -f1)
+CPU_LOAD_5=$(echo $CPU_LOAD_AVERAGES | cut -d, -f2)
+CPU_LOAD_15=$(echo $CPU_LOAD_AVERAGES | cut -d, -f3)
+
+# Calculate CPU utilization for each load average
+CPU_LOAD_AVERAGE_1=$(awk -v cores=$CPU_CORES '{print ($1 / cores) * 100}' <<< "$CPU_LOAD_1")
+CPU_LOAD_AVERAGE_5=$(awk -v cores=$CPU_CORES '{print ($1 / cores) * 100}' <<< "$CPU_LOAD_5")
+CPU_LOAD_AVERAGE_15=$(awk -v cores=$CPU_CORES '{print ($1 / cores) * 100}' <<< "$CPU_LOAD_15")
+
 # Print the results
 echo "[$HOSTNAME:cpu]"
-echo "load: $LOAD_AVERAGE"
+echo "load_avg_1m: $CPU_LOAD_AVERAGE_1"
+echo "load_avg_5m: $CPU_LOAD_AVERAGE_5"
+echo "load_avg_15m: $CPU_LOAD_AVERAGE_15"
 
  # Get the RAM status
 RAM_STATUS=$(free 2>/dev/null | grep Mem)
