@@ -4,6 +4,7 @@
 SENSORS_LIST_FILE="sensors.txt" # sensor list
 SENSOR_WORKDIR="/monitor"
 SENSOR_SCRIPT="base.sensor.sh" # sensor script
+API_ENDPOINT="http://localhost:3001/api/devices/generate"
 # Get the name of the parent process
 PPID_NAME=$(ps -o comm= $PPID)
 # Delay between data snapshots
@@ -75,9 +76,17 @@ for SENSOR_NAME in "${SENSORS[@]}"; do
             install_sensor_update $SENSOR_IP $SENSOR_SCRIPT
         fi
         # Get the base sensor data
-        BASE_SENSOR_DATA=$(ssh $SENSOR_IP "cd /$SENSOR_WORKDIR && ./$SENSOR_SCRIPT" 2>/dev/null | srvenv/bin/python capture.sensor.py -s $SENSOR_NAME | jq)
-        # echo $BASE_SENSOR_DATA","
-        # printf "%b\n" "$BASE_SENSOR_DATA"
+        BASE_SENSOR_DATA=$(ssh $SENSOR_IP "cd /$SENSOR_WORKDIR && ./$SENSOR_SCRIPT" 2>/dev/null | srvenv/bin/python capture.sensor.py -s $SENSOR_NAME)
+        # Save to DB
+        curl -s -X 'POST' \
+            "${API_ENDPOINT}" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -d $BASE_SENSOR_DATA >> /dev/null | jq
+            # -d '{
+            #     device_id: '${SENSOR_NAME}',
+            #     temperature: '${temp}'
+            # }' >> /dev/null | jq
         printf "%b\n" "$BASE_SENSOR_DATA, "
     else
         echo "Sensor $SENSOR_NAME not found in network-devices.sh output."

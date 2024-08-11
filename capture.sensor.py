@@ -47,10 +47,10 @@ def main():
     json_string = json.dumps(parsed_data, indent=4)
 
     # Save to MongoDB
-    client = MongoClient("mongodb://admin:admin@100.127.213.29:27017/")
-    db = client["dexterlab"]
-    collection = db["sensors"]
-    collection.insert_one(parsed_data)
+    # client = MongoClient("mongodb://admin:admin@100.127.213.29:27017/")
+    # db = client["dexterlab"]
+    # collection = db["sensors"]
+    # collection.insert_one(parsed_data)
 
     # # Save to JSON file
     # json_filename = f"{args.sensor}.json"
