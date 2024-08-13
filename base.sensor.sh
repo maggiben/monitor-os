@@ -105,13 +105,7 @@ AVAILABLE_SPACE=$(df -Bh / 2>/dev/null | grep -E '^/dev' | awk -F' ' '{print "to
 echo "[$HOSTNAME:hdd]"
 printf "%b\n" "$AVAILABLE_SPACE"
 
-# Get the temperature
-TEMPERATURE=$(vcgencmd measure_temp 2>/dev/null | awk -F'=' '{print $2}')
-# Print the results
-echo "[$HOSTNAME:sensors]"
-echo "temperature: $TEMPERATURE"
-
-# Print the results
+# Get Sensor data
 echo "[$HOSTNAME:sensors]"
 get_sensor_data
 
