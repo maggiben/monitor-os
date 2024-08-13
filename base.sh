@@ -26,10 +26,10 @@ function check_sensor_update() {
     local remote_file="$SENSOR_WORKDIR/$(basename $local_file)"
 
     # Calculate the SHA-256 checksum of the local file
-    local_local_hash=$(sha256sum "$local_file" | awk '{ print $1 }')
+    local local_local_hash=$(sha256sum "$local_file" | awk '{ print $1 }')
 
     # Calculate the SHA-256 checksum of the remote file
-    remote_remote_hash=$(ssh "$sensor_ip" sha256sum "$remote_file" | awk '{ print $1 }')
+    local remote_remote_hash=$(ssh "$sensor_ip" sha256sum "$remote_file" | awk '{ print $1 }')
 
     # Compare the hashes
     if [ "$local_local_hash" != "$remote_remote_hash" ]; then
@@ -71,14 +71,14 @@ function get_sensor_data() {
     # Iterate over each sensor name
     for SENSOR_NAME in "${SENSORS[@]}"; do
         # Get the IP address of the sensor from the output of network-devices.sh
-        SENSOR_IP=$(sudo docker exec tailscaled tailscale status | grep "$SENSOR_NAME" | awk '{print $1}')
-        if [ -n "$SENSOR_IP" ]; then
-            check_sensor_update $SENSOR_IP $SENSOR_SCRIPT
+        local sensor_ip=$(sudo docker exec tailscaled tailscale status | grep "$SENSOR_NAME\s" | awk '{print $1}')
+        if [ -n "$sensor_ip" ]; then
+            check_sensor_update $sensor_ip $SENSOR_SCRIPT
             if [ $? -eq 1 ]; then
-                install_sensor_update $SENSOR_IP $SENSOR_SCRIPT
+                install_sensor_update $sensor_ip $SENSOR_SCRIPT
             fi
             # Get the base sensor data
-            BASE_SENSOR_DATA=$(ssh $SENSOR_IP "cd /$SENSOR_WORKDIR && ./$SENSOR_SCRIPT" 2>/dev/null | srvenv/bin/python capture.sensor.py -s $SENSOR_NAME)
+            local base_sensor_data=$(ssh $sensor_ip "cd $SENSOR_WORKDIR && ./$SENSOR_SCRIPT" 2>/dev/null | srvenv/bin/python capture.sensor.py -s $SENSOR_NAME)
             # Add a comma if it's not the first item
             if [ "$first" = true ]; then
                 first=false
@@ -86,7 +86,7 @@ function get_sensor_data() {
                 printf ",\n"
             fi
 
-            printf "%b\n" "$BASE_SENSOR_DATA"
+            printf "%b\n" "$base_sensor_data"
         else
             # echo "Sensor $SENSOR_NAME not found in network-devices.sh output."
             return 1

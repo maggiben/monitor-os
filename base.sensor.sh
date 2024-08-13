@@ -3,6 +3,7 @@ VERSION="0.0.6"
 HOSTNAME=$(hostname)
 # Get the name of the script
 SCRIPT_FILE_NAME=$(basename $0)
+PENV=/home/bmaggi/.platformio/penv/bin
 # Function to convert bytes to human-readable format
 function convert_to_human_readable() {
     local BYTES=$1
@@ -59,6 +60,30 @@ function process_flow_file() {
     fi
 }
 
+function get_sensor_data() {
+    if [[ $HOSTNAME == *"weather"* ]]; then # only run if hostname contains the word weather for weather monitoring stations
+        # Run the sensor command and capture its output
+        local sensor_output=$($PENV/python3 /garden-weather/serial-command.py -m "get-sensor")
+        
+        # Extract and display the values for humidity, temperature, and soil moisture sensors
+        local humidity=$(echo "$sensor_output" | grep -oP '(?<=humidity: )\S+')
+        local temperature=$(echo "$sensor_output" | grep -oP '(?<=temperature: )\S+')
+
+        echo "humidity: $humidity"
+        echo "temperature: $temperature"
+
+        # Loop through the soil moisture sensors
+        for i in {0..3}; do
+            soil_moisture=$(echo "$sensor_output" | grep -oP "(?<=soil_moisture_$i: )\S+")
+            echo "soil_moisture_$i: $soil_moisture"
+        done
+    else
+        # Get the temperature
+        local temperature=$(vcgencmd measure_temp 2>/dev/null | awk -F'=' '{print $2}')
+        echo "temperature: $temperature"
+    fi
+}
+
 # Script info
 SCRIPT_UPDATE_TIME=$(stat -c %y $SCRIPT_FILE_NAME)
 echo "[$HOSTNAME:script]"
@@ -85,6 +110,10 @@ TEMPERATURE=$(vcgencmd measure_temp 2>/dev/null | awk -F'=' '{print $2}')
 # Print the results
 echo "[$HOSTNAME:sensors]"
 echo "temperature: $TEMPERATURE"
+
+# Print the results
+echo "[$HOSTNAME:sensors]"
+get_sensor_data
 
 # Get Watering flow status TODO: move to special host scritps
 if [[ $HOSTNAME == "indoor-smart-water" ]]; then

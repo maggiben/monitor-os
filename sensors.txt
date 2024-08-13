@@ -1,3 +1,4 @@
+indoor-big-weather
 indoor-big
 indoor-small
 indoor-smart-water
