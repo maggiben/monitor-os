@@ -63,7 +63,7 @@ function process_flow_file() {
 function get_sensor_data() {
     if [[ $HOSTNAME == *"weather"* ]]; then # only run if hostname contains the word weather for weather monitoring stations
         # Run the sensor command and capture its output
-        local sensor_output=$($PENV/python3 /garden-weather/serial-command.py -m "get-sensor")
+        local sensor_output=$($PENV/python3 /garden-weather/serial-command.py -m "get-sensor" 2> /dev/null)
         
         # Extract and display the values for humidity, temperature, and soil moisture sensors
         local humidity=$(echo "$sensor_output" | grep -oP '(?<=humidity: )\S+')
