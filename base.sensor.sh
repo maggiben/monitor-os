@@ -4,26 +4,6 @@ HOSTNAME=$(hostname)
 # Get the name of the script
 SCRIPT_FILE_NAME=$(basename $0)
 PENV=/home/bmaggi/.platformio/penv/bin
-# Function to convert bytes to human-readable format
-function convert_to_human_readable() {
-    local BYTES=$1
-    local UNIT="B"
-    local VALUE=$BYTES
-
-    if [ $BYTES -ge 1073741824 ]; then
-        UNIT="GB"
-        VALUE=$(echo "$BYTES / 1073741824" | bc -l)
-    elif [ $BYTES -ge 1048576 ]; then
-        UNIT="MB"
-        VALUE=$(echo "$BYTES / 1048576" | bc -l)
-    elif [ $BYTES -ge 1024 ]; then
-        UNIT="KB"
-        VALUE=$(echo "$BYTES / 1024" | bc -l)
-    fi
-
-    # Round to 2 decimal places
-    printf "%.2f %s" $VALUE $UNIT
-}
 
 # Function to process last-flow.txt and generate the output string
 function process_flow_file() {
@@ -161,8 +141,8 @@ TX_BYTES=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes) # Fetch TX bytes
 PING_TIME=$(ping -c 1 google.com | awk -F'[ =]' '/time=/{print "ping:", $11"ms"}')
 # Print the results
 echo "[$HOSTNAME:network]"
-echo "RX: $(convert_to_human_readable $RX_BYTES)"
-echo "TX: $(convert_to_human_readable $TX_BYTES)"
+echo "RX: $RX_BYTES"
+echo "TX: $TX_BYTES"
 echo $PING_TIME
 
 # Get system uptime
