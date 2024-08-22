@@ -87,7 +87,7 @@ check_alarm_running() {
         # Assume you know some criteria to identify the correct job (e.g., command or user)
         local alarms=$(atq 2>/dev/null | wc -l)
 
-        if [ $alarms -eq 0 ]; then
+        if [ -n "$alarms" ] && [ "$alarms" -eq 0 ]; then
             return 1 # No alarms running
         else
             # For each alarm ID in atq, issue atrm to remove the jobs
