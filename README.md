@@ -1,4 +1,4 @@
-## Create service in main
+## Create service in main host
 `sudo vi /etc/systemd/system/indoor-sensor-status.service`
 Add this code
 ```sh
@@ -17,7 +17,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-## Create service
+## Create service on the watering host
 `sudo vi /etc/systemd/system/indoor-watering-status.service`
 Add this code
 ```sh
