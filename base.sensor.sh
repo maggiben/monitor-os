@@ -48,9 +48,11 @@ function get_sensor_data() {
         # Extract and display the values for humidity, temperature, and soil moisture sensors
         local humidity=$(echo "$sensor_output" | grep -oP '(?<=humidity: )\S+')
         local temperature=$(echo "$sensor_output" | grep -oP '(?<=temperature: )\S+')
+        local co2=$(echo "$sensor_output" | grep -oP '(?<=co2: )\S+')
 
         echo "humidity: $humidity"
         echo "temperature: $temperature"
+        echo "co2: $co2"
 
         # Loop through the soil moisture sensors
         for i in {0..3}; do
